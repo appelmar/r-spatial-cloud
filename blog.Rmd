@@ -13,17 +13,16 @@ knitr::opts_chunk$set(eval = TRUE)
 ```
 
 
-One of the advantages of today's cloud computing platforms is that many of them include a large catalog of open data. This includes petabyte-scale collections of satellite imagery as from the Landsat and Copernicus missions, where downloading
-data can be rather frustrating and time-consuming.
+One of the advantages of today's cloud computing platforms is that many of them include a large catalog of open data. This includes petabyte-scale collections of satellite imagery as from the Landsat and Copernicus missions. Downloading
+larger amounts of such data can be frustrating, time-consuming, or simply unfeasible.
 
 Coming from a local analysis workflow where imagery lies somewhere on your disk, there are two important differences that require some additional work on cloud platforms. First, it may not be straightforward to discover the data. For example, the [Sentinel-2 imagery in the Google Cloud](https://cloud.google.com/storage/docs/public-datasets/sentinel-2#dataset_access) is indexed as a 2 GB CSV file (or available in BigQuery). Performing essential queries like _"find all images that spatially intersect with a region of interest and have been recorded within a certain period of time"_ may involve some effort and depends on how 
 the data is indexed. Second, image data is located on object storage and the communication works over HTTP.
 For typical image file formats such as JPEG2000, only complete files can be queried even if small 
-blocks or pixels at lower resolution are needed. Assuming a common size of hundreds of megabytes per image file, this leads to a lot of unneded data transfer if we work for smaller regions and/or at lower resolution. 
+blocks or pixels at lower resolution are needed. Assuming a common size of hundreds of megabytes per image file, this leads to a lot of unneeded data transfer if we work for smaller regions and/or at lower resolution. 
 
-Two recent developments that address these issues are the [SpatioTemporal Asset Catalog (STAC)](https://stacspec.org) and the [Cloud Optimized GeoTIFF (COG)](https://www.cogeo.org) file format. This blog post briefly introduces STAC and COGs and afterwards presents some ongoing developments to facilitate Earth observation data analysis on cloud platforms with R. 
+Two recent developments that address these issues are the [SpatioTemporal Asset Catalog (STAC)](https://stacspec.org) and the [Cloud Optimized GeoTIFF (COG)](https://www.cogeo.org) file format. This blog post briefly introduces STAC and COGs and presents ongoing developments that make it easier to analyse Earth observation data on cloud platforms using R. 
 We use a small machine on Amazon Web Services (AWS) and the open [Sentinel-2 COG catalog](https://registry.opendata.aws/sentinel-2-l2a-cogs) containing Level-2A (surface reflectance) imagery from the Sentinel-2 satellites in a few examples by combining the R packages `rstac` and `gdalcubes`. (TODO: and stars??)
-
 
 
 # SpatioTemporal Asset Catalog (STAC)
@@ -42,7 +41,7 @@ More details can be found on the [COG website](https://www.cogeo.org/) and the [
 
 # Launching an EC2 instance on AWS
 
-We launch a rather cheap machine on AWS in the region us-west-2 (Oregon), where the 
+We launch a rather cheap machine (t3.large) on AWS in the region us-west-2 (Oregon), where the 
 data is located. Using the AWS management console makes this straightforward.
 
 ![](AWS_screenshot.png){ style="width:70%; margin:auto; display: block;"}
@@ -84,15 +83,15 @@ s = stac("https://earth-search.aws.element84.com/v0")
 
 items <- s %>%
     stac_search(collections = "sentinel-s2-l2a-cogs",
-				bbox = c(6.1,46.2,6.2,46.3), # Geneve
+				bbox = c(6.1,46.2,6.2,46.3), # Geneva
 				datetime = "2020-01-01/2020-12-31",
 				limit = 500) %>%
     post_request() 
 items
 ```
 
-The result is a list containing some general metadata (e.g., STAC version, used extensions, and the number of returned and matching features) and a list of features. Each feature corresponds to an image and contains a unique identifier,
-the spatial footprint and bounding box, further properties (recording datetime and per image metadata such as cloud cover percentage), and a list of assets. Each asset points to a URL like an image file and again may include further metadata. Here, the spectral bands are individual assets but assets may also point to non-image data.  Notice that STAC API instances may limit the maximum number of resulting features per request. In the example, 147 images have been returned.
+The result is a list containing some general metadata (e.g., STAC version, STAC extensions used, and the number of returned and matching features) as well as the list of features. Each feature corresponds to an image and contains a unique identifier,
+the spatial footprint and bounding box, further properties (recording datetime and per image metadata such as cloud cover percentage), and a list of assets. Each asset contains a URL that points to an image file and again may include further metadata. Here, the spectral bands are individual assets but assets may also point to non-image data.  Notice that STAC API instances may limit the maximum number of resulting features per request. In the example, 147 images were returned.
 
 Printing an asset element of one of the images shows that links to imagery are simply URLs of GeoTIFF files located on an AWS S3 bucket.
 
@@ -103,12 +102,12 @@ items$features[[4]]$assets$B04
 
 # On-demand data cubes with `gdalcubes`
 
-The `gdalcubes` package creates and processes regular on-demand data cubes from satellite image collections, where images may have different spatial reference systems, spectral bands may have different pixel sizes, images may overlap, and are irregularly recorded in time. It uses GDAL to read and warp images and hence directly works with COGs in cloud computing environments. An introduction into the package can be found in an earlier [r-spatial blog post](https://www.r-spatial.org/r/2019/07/18/gdalcubes1.html) and on [GitHub](https://github.com/appelmar/gdalcubes_R).
+The `gdalcubes` package creates and processes regularly discretised data cubes on demand from satellite image collections, where images may have different spatial reference systems, spectral bands may have different pixel sizes, images may overlap, and images may be recorded irregularly over time. It uses GDAL to read and warp images and hence directly works with COGs in cloud computing environments. An introduction into the package can be found in an earlier [r-spatial blog post](https://www.r-spatial.org/r/2019/07/18/gdalcubes1.html) and on [GitHub](https://github.com/appelmar/gdalcubes_R).
 
 The latest development version of `gdalcubes` ([see GitHub](https://github.com/appelmar/gdalcubes_R)) adds a function that converts STAC feature collections (as returned from the `rstac` package) to image collections. Compared to local processing, creating image collections from STAC is very fast, because no metadata must be read from the files.
 The function `stac_image_collection()` expects a STAC feature collection as a list and takes further arguments to filter images by metadata (e.g. cloud coverage) or by asset names (e.g., spectral bands), and to modify URLs of images. The latter is important to explain GDAL how to access URLs. By default `/vsicurl/` is added as a prefix to URLs to make use of GDAL's virtual file system. 
 
-To get started, we first need to install the GitHub version of `gdalcubes`, which is easisest from the command line by executing:
+To get started, we first need to install the GitHub version of `gdalcubes`, which can be done from the command line by:
 
 ```
 git clone --recursive https://github.com/appelmar/gdalcubes_R
@@ -117,7 +116,6 @@ cd gdalcubes_R && R CMD INSTALL .
 
 Afterwards, we load the package and use the result of the previous STAC request to create an image collection from all images
 with less than 20% clouds.
-
 
 ```{r}
 library(gdalcubes)
@@ -133,10 +131,10 @@ col = stac_image_collection(items$features, asset_names = assets,
                             property_filter = function(x) {x[["eo:cloud_cover"]] < 20})
 ```
 
-The warning simply tells us that metadata is missing for the SCL assets. In the future, we might make 
+The warning tells us that metadata is missing for the SCL assets. In the future, we might make 
 this a bit more clever by considering further STAC asset metadata (such as the asset type). 
 
-Thanks to `gdalcubes`, we do not need to care about differences of the spatial resolution of the assets and different spatial reference systems and spatial overlaps of the images.  After creating the image collection, we can work with `gdalcubes` as with any local image collection. For example, the following script will generate a cloud-free mosaic image at 20m spatial resolution for Geneva 2020 by computing the median values of the visible spectral bands over time for all pixels that have not been classified as clouds or cloud shadows. 
+Thanks to `gdalcubes`, we do not need to care about differences of the spatial resolution of the assets and different spatial reference systems and spatial overlaps of the images.  After creating the image collection, we can work with `gdalcubes` as with any local image collection. For example, the following script generates a cloud-free mosaic image at 20m spatial resolution for Geneva 2020 by computing for each pixel the median value of the visible spectral bands over time, for all pixels that have not been classified as clouds or cloud shadows. 
 
 ```{r}
 v = cube_view(srs = "EPSG:3857",  extent = list(t0 = "2020-01-01", t1 = "2020-12-31",
@@ -255,18 +253,13 @@ mapview(difference)
 # Summary
 
 
-With approximately 20 lines of code, the combination of STAC, COGs, and data cubes allows to access and apply R functions on satellite imagery available on AWS. Even with a very small machine instance type, we could do some experiments for smaller areas of interest. Most of this is only possible because GDAL can efficiently read and write COGs even on cloud storage.
+With only a few lines of code, the combination of STAC, COGs, and data cubes allows to access and apply R functions on satellite imagery available on AWS. Even with a very small machine instance type, we could do some experiments for smaller areas of interest. Most of this is only possible because GDAL can efficiently read and write COGs even on cloud storage.
 
 However, although STAC is gaining a lot of popularity these days, not all of the available catalogs point to individual images
-and some catalogs simply provide original image files but no COGs, which slows down the processing. 
+and some catalogs simply provide original image files but no COGs, which may slow down the processing. 
 For a good reason, STAC API endpoints contain request limits on the number of returned features. When requesting 
-longer time series or larger areas, these limits are quickly exceeded and it is up to the user to subdivide queries. 
+longer time series or larger areas, these limits are quickly reached and it is up to the user to subdivide queries. 
 Another useful feature for STAC API would be server-side filtering of features by properties. In the examples, responses contained 
 all images, which we needed to filter by cloud coverage afterwards.
 
-The performed analyses have been rather simple but running more complex analyses is straightforward. In our examples, we used one of the cheapest EC2 instance (0.0832 USD per hour + disk storage). Executing this R markdown document on this instance  took around 7 minutes.  Although there are very powerful instance types (e.g. with 96 CPU cores, 768 GB main memory), analysis on very large scale might require running hundreds of instances at the same time. Cloud platforms of course include services to do this but distributing the work might include additional considerations. 
-
-
-
-
-
+The performed analyses have been rather simple but running more complex analyses is straightforward. In our examples, we used a rather modest EC2 instance (t3.large: 2 CPU's, 8 Gb RAM, I/O 5 Gigabit, 0.0832 USD per hour or 61 USD per month, + disk storage). Executing this R markdown document on this instance  took around 7 minutes.  Although there are very powerful instance types (e.g. with 96 CPU cores, 768 GB main memory), analysis on very large scale might work better by running many instances at the same time. Cloud platforms of course include services to do this, and distributing the work outlined above over many instances involves additional considerations. 
