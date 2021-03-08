@@ -1,7 +1,7 @@
 ---
 title: "Cloud-based processing of satellite image collections in R using STAC, COGs, and on-demand data cubes"
-author: "Marius Appel, Edzer Pebesma?, Matthias Mohr?"
-date: "Feb 3. 2021"
+author: "Marius Appel, Edzer Pebesma, Matthias Mohr"
+date: "Mar 8. 2021"
 output: 
   html_document:
     theme: paper
@@ -30,6 +30,7 @@ We use a small machine on Amazon Web Services (AWS) and the open [Sentinel-2 COG
 [STAC](https://stacspec.org) is an emerging specification and ecosystem to describe, find and work with geospatial datasets in a cloud-native manner using [static metadata files](https://github.com/radiantearth/stac-spec) or an [API](https://github.com/radiantearth/stac-api-spec). Its goal is to get away from proprietary APIs for exposing geospatial assets and thus increase interoperability and ease of use across domains such as [Optical](https://github.com/radiantearth/stac-spec/blob/master/extensions/eo/README.md), [SAR](https://github.com/stac-extensions/sar), [LIDAR](https://github.com/stac-extensions/pointcloud) or [ML](https://github.com/stac-extensions/label). The main focus of STAC is to expose metadata for search and discovery so that interested parties get aware of data made available, e.g. through finding them in a normal search engine such as Google or Bing. Apart from search and discovery, STAC is extensible with [various extensions](https://github.com/radiantearth/stac-spec/blob/master/extensions/README.md) already defined and it it also possible to link to additional metadata and other related information.
 
 STAC is a set of four complimentary specifications:
+
 * The [**Collection** specification]() is meant to expose high-level information about a dataset with similar characteristics, e.g. all imagery captured in the Sentinel 2 mission. 
 * The **Item** specification describes single parts of the mission, e.g. a single Sentinel 2 image with all bands included. The files exposed by an Item are the **Assets**.
 * The **Catalog** specification allows to group Collections and Items by various aspects so that they are easier to browse through.
@@ -69,7 +70,7 @@ sudo apt update && sudo apt install r-base
 If you prefer to use RStudio, it is also straightforward to install RStudio Server and add a security rule to make it accessible on port 8787 in the AWS management console. Afterwards, we can install quite a few R packages:
 
 ```{r, eval = FALSE}
-install.packages(c("sf","stars","magick","rmarkdown","ncdf4","Rcpp","jsonlite","RcppProgress", "rstac", "mapview"))
+install.packages(c("sf","stars","magick","rmarkdown","ncdf4","Rcpp","jsonlite","RcppProgress", "rstac", "tmap"))
 ```
 
 To avoid these step when launching another instance, we might collect everything in a Docker image and use additional services of 
@@ -196,7 +197,7 @@ raster_cube(col, v, mask = S2.mask) %>%
 As a last example, we assess forest cover over a small area in the Brazilian Amazon region.
 We derive separate maximum NDVI composite images for the dry seasons of 2019 and 2020 and 
 filter pixels whose maximum NDVI change is lower than -0.15 using the `stars` package and 
-plot an interactive map using `mapview`. 
+plot an interactive map using `tmap`. 
 
 ```{r,warning=FALSE}
 items_2019 <- s %>%
@@ -242,8 +243,9 @@ max_ndvi_mosaic(col_2020, v_2020) %>%
 difference = maxndvi_2020 - maxndvi_2019
 difference[difference > -0.15] = NA
 
-library(mapview)
-mapview(difference)
+library(tmap)
+tmap_mode("view")
+tm_basemap("Esri.WorldImagery") + tm_shape(difference) + tm_raster()
 ```
 
 
