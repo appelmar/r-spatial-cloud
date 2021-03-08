@@ -27,8 +27,17 @@ We use a small machine on Amazon Web Services (AWS) and the open [Sentinel-2 COG
 
 # SpatioTemporal Asset Catalog (STAC)
 
--> Matthias?
+[STAC](https://stacspec.org) is an emerging specification and ecosystem to describe, find and work with geospatial datasets in a cloud-native manner using [static metadata files](https://github.com/radiantearth/stac-spec) or an [API](https://github.com/radiantearth/stac-api-spec). Its goal is to get away from proprietary APIs for exposing geospatial assets and thus increase interoperability and ease of use across domains such as [Optical](https://github.com/radiantearth/stac-spec/blob/master/extensions/eo/README.md), [SAR](https://github.com/stac-extensions/sar), [LIDAR](https://github.com/stac-extensions/pointcloud) or [ML](https://github.com/stac-extensions/label). The main focus of STAC is to expose metadata for search and discovery so that interested parties get aware of data made available, e.g. through finding them in a normal search engine such as Google or Bing. Apart from search and discovery, STAC is extensible with [various extensions](https://github.com/radiantearth/stac-spec/blob/master/extensions/README.md) already defined and it it also possible to link to additional metadata and other related information.
 
+STAC is a set of four complimentary specifications:
+* The [**Collection** specification]() is meant to expose high-level information about a dataset with similar characteristics, e.g. all imagery captured in the Sentinel 2 mission. 
+* The **Item** specification describes single parts of the mission, e.g. a single Sentinel 2 image with all bands included. The files exposed by an Item are the **Assets**.
+* The **Catalog** specification allows to group Collections and Items by various aspects so that they are easier to browse through.
+* **STAC API** is the last specification in this list, which is a superset of [OGC API - Features](https://www.ogc.org/standards/ogcapi-features) and aligns with their extensions as well.
+
+The ecosystem of STAC software and catalogs is growing. [STAC Index](https://stacindex.org/) gives an overview over [STAC catalogs and APIs](https://stacindex.org/catalogs). The [list of software](https://stacindex.org/ecosystem) unfortunately doesn't contain a lot of [R-based implementations](https://stacindex.org/ecosystem?language=R) yet.
+
+A number of interesting talks about cloud native geospatial with strong focus on STAC can be found in the YouTube playlist of the [Cloud Native Geospatial Outreach Day 2020](https://www.youtube.com/playlist?list=PL3QzFgBMGnbQWbW-V09AzSfCbnf6Q87Rq).
 
 # Cloud Optimized GeoTIFF (COG) 
 
