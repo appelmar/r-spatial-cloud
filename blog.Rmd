@@ -1,7 +1,7 @@
 ---
 title: "Cloud-based processing of satellite image collections in R using STAC, COGs, and on-demand data cubes"
 author: "Marius Appel, Edzer Pebesma, Matthias Mohr"
-date: "Mar 8. 2021"
+date: "Mar 11. 2021"
 output: 
   html_document:
     theme: paper
@@ -97,6 +97,7 @@ items <- s %>%
 				datetime = "2020-01-01/2020-12-31",
 				limit = 500) %>%
     post_request() 
+
 items
 ```
 
@@ -108,6 +109,18 @@ Printing an asset element of one of the images shows that links to imagery are s
 ```{r}
 items$features[[4]]$assets$B04
 ```
+
+To perform server-side filtering of images by properties such as cloud cover percentage, we can modify the query object returned from `stac_search()` and add further query parameters. However, this only works if the STAC API service supports the [STAC API Query extension](https://github.com/radiantearth/stac-api-spec/tree/master/item-search#query). Below, we add a `query` HTTP POST parameter to return only images with less than 20% cloud coverage.  
+
+```{r}
+q <- s %>% stac_search(collections = "sentinel-s2-l2a-cogs",
+				bbox = c(6.1,46.2,6.2,46.3), # Geneva
+				datetime = "2020-01-01/2020-12-31",
+				limit = 500)
+q$params$query = "{\"eo:cloud_cover\": {\"lt\": 10}}" # JSON property filter
+q %>% post_request() 
+```
+This functionality is quite important for the analysis of larger areas or long time series in order to deal with limits on the number of returned items. The extension is currently in the pilot stage and might be replaced by CQL filters in the future (following OGC API - Features). In the following smaller examples, we therefore simply request all available images and filter by cloud cover on the client side.  
 
 
 # On-demand data cubes with `gdalcubes`
@@ -199,7 +212,7 @@ We derive separate maximum NDVI composite images for the dry seasons of 2019 and
 filter pixels whose maximum NDVI change is lower than -0.15 using the `stars` package and 
 plot an interactive map using `tmap`. 
 
-```{r,warning=FALSE}
+```{r,warning=FALSE, out.width="100%"}
 items_2019 <- s %>%
     stac_search(collections = "sentinel-s2-l2a-cogs",
 				bbox = c(-66.2,-9.3, -65.5, -8.7),
@@ -242,10 +255,11 @@ max_ndvi_mosaic(col_2020, v_2020) %>%
 
 difference = maxndvi_2020 - maxndvi_2019
 difference[difference > -0.15] = NA
+names(difference) <- "Difference of max NDVI (2020 - 2019)"
 
 library(tmap)
 tmap_mode("view")
-tm_basemap("Esri.WorldImagery") + tm_shape(difference) + tm_raster()
+tm_basemap("Esri.WorldImagery") + tm_shape(difference) + tm_raster(palette = colorspace::sequential_hcl(8, palette = "Red-Blue"))
 ```
 
 
@@ -269,7 +283,8 @@ With only a few lines of code, the combination of STAC, COGs, and data cubes all
 However, although STAC is gaining a lot of popularity these days, not all of the available catalogs point to individual images
 and some catalogs simply provide original image files but no COGs, which may slow down the processing. 
 For a good reason, STAC API endpoints contain request limits on the number of returned features. When requesting 
-longer time series or larger areas, these limits are quickly reached and it is up to the user to subdivide queries. 
+longer time series or larger areas, these limits are quickly reached and it is up to the user to subdivide queries.
+
 Another useful feature for STAC API would be server-side filtering of features by properties. In the examples, responses contained 
 all images, which we needed to filter by cloud coverage afterwards.
 
