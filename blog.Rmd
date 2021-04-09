@@ -246,63 +246,11 @@ tmap_mode("view")
 tm_basemap("Esri.WorldImagery") + tm_shape(difference) + tm_raster()
 ```
 
-When we convert to stars objects, we can apply any R function to
-the data cube. We will first create an NDVI time series for 2019:
-
-```{r}
-ndvi_mosaic <- function(col, v) {
-    raster_cube(col, v, mask = S2.mask) %>%
-    select_bands(c("B04", "B08")) %>%
-    apply_pixel(c("(B08-B04)/(B08+B04)"), names="NDVI")
-}
-ndvi_mosaic(col_2019, v_2019) %>%
-    st_as_stars() -> ndvi_2019
-plot(ndvi_2019)
-```
-
-As we can see, a rather large fragment of the time steps are
-entirely missing-valued. We can select the images with at least
-30% coverage by
-```{r}
-sel = st_apply(ndvi_2019, 3, function(x) mean(is.na(x)))[[1]] < .7
-ndvi_2 = ndvi_2019[,,,which(sel)]
-```
-
-Two simple examples that reduce the time dimension are now given.
-First, are a spatial clustering of the pixel time series is
-computed and shown by
-
-```{r}
-library(clue)
-# create a predict method for kmeans objects:
-predict.kmeans = function(object, newdata, ...) {
-    unclass(clue::cl_predict(object, newdata[, -c(1:2)], ...))
-}
-ndvi.spl = split(ndvi_2)
-nclus = 5
-#sam = st_sample(ndvi.spl, 1000) # randomly sample training data
-#k = kmeans(na.omit(as.data.frame(sam)[, -c(1:2)]), nclus)
-#out = predict(ndvi.spl, k)
-#plot(out, col = sf.colors(nclus, categorical=TRUE))
-
-```
-
-or pixel-wise time series modelling; here we map the autoregression
-coefficient of an AR(1) model fitted to the NDVI time series,
-along with its standard error:
-
-```{r}
-ar1 = function(ts) {
-  ts = na.omit(ts)
-  if (length(ts) > 5) {
-    m = arima(na.omit(ts), c(1, 0, 0), method = "ML") # fit AR(1) model
-    c(coef(m)[1], sqrt(vcov(m)[1,1])) # coefficient + s.e.
-  } else
-    c(NA_real_, NA_real_)
-}
-res = st_apply(ndvi_2019, 1:2, ar1)
-plot(res)
-```
+When we convert to stars objects, we can apply any R function
+to the data cube, such as spatial clustering, classification of
+time series, or time series analysis methods. Examples of this
+are given in the stars vignette [Statistical modelling with stars
+objects](https://r-spatial.github.io/stars/articles/stars7.html).
 
 # Summary
 
