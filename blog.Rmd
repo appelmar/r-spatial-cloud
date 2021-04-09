@@ -1,7 +1,7 @@
 ---
 title: "Cloud-based processing of satellite image collections in R using STAC, COGs, and on-demand data cubes"
 author: "Marius Appel, Edzer Pebesma, Matthias Mohr"
-date: "Mar 11. 2021"
+date: "Apr 09. 2021"
 output: 
   html_document:
     theme: paper
@@ -22,7 +22,7 @@ For typical image file formats such as JPEG2000, only complete files can be quer
 blocks or pixels at lower resolution are needed. Assuming a common size of hundreds of megabytes per image file, this leads to a lot of unneeded data transfer if we work for smaller regions and/or at lower resolution. 
 
 Two recent developments that address these issues are the [SpatioTemporal Asset Catalog (STAC)](https://stacspec.org) and the [Cloud Optimized GeoTIFF (COG)](https://www.cogeo.org) file format. This blog post briefly introduces STAC and COGs and presents ongoing developments that make it easier to analyse Earth observation data on cloud platforms using R. 
-We use a small machine on Amazon Web Services (AWS) and the open [Sentinel-2 COG catalog](https://registry.opendata.aws/sentinel-2-l2a-cogs) containing Level-2A (surface reflectance) imagery from the Sentinel-2 satellites in a few examples by combining the R packages `rstac` and `gdalcubes`. (TODO: and stars??)
+We use a small machine on Amazon Web Services (AWS) and the open [Sentinel-2 COG catalog](https://registry.opendata.aws/sentinel-2-l2a-cogs) containing Level-2A (surface reflectance) imagery from the Sentinel-2 satellites in a few examples by combining the R packages `rstac` and `gdalcubes`.
 
 
 # SpatioTemporal Asset Catalog (STAC)
@@ -36,7 +36,7 @@ STAC is a set of four complimentary specifications:
 * The **Catalog** specification allows to group Collections and Items by various aspects so that they are easier to browse through.
 * **STAC API** is the last specification in this list, which is a superset of [OGC API - Features](https://www.ogc.org/standards/ogcapi-features) and aligns with their extensions as well.
 
-The ecosystem of STAC software and catalogs is growing. [STAC Index](https://stacindex.org/) gives an overview over [STAC catalogs and APIs](https://stacindex.org/catalogs). The [list of software](https://stacindex.org/ecosystem) unfortunately doesn't contain a lot of [R-based implementations](https://stacindex.org/ecosystem?language=R) yet.
+The ecosystem of STAC software and catalogs is growing. [STAC Index](https://stacindex.org/) gives an overview over [STAC catalogs and APIs](https://stacindex.org/catalogs). The [list of software](https://stacindex.org/ecosystem) with [R-based implementations](https://stacindex.org/ecosystem?language=R) is so far limited to the `rstac` CRAN package.
 
 A number of interesting talks about cloud native geospatial with strong focus on STAC can be found in the YouTube playlist of the [Cloud Native Geospatial Outreach Day 2020](https://www.youtube.com/playlist?list=PL3QzFgBMGnbQWbW-V09AzSfCbnf6Q87Rq).
 
@@ -45,8 +45,6 @@ A number of interesting talks about cloud native geospatial with strong focus on
 COGs can be seen as special GeoTIFF files where image data is stored block-wise (tiled) and the order of metadata entries and 
 pixel data on full resolution and optional overview images follows a specific structure. 
 More details can be found on the [COG website](https://www.cogeo.org/) and the [GDAL COG driver documentation](https://gdal.org/drivers/raster/cog.html). If we request a block of pixels, COGs allow to automatically find out which bytes of the file must be read and hence HTTP GET range requests become possible. The availability of overview images within a COG is essential to allow fast (on-the-fly) analysis on low resolution (as we know from [Google Earth Engine](https://earthengine.google.com/), where only pixels that are actually displayed on the screen are computed). Fortunately, [GDAL](https://gdal.org/) not only supports reading and writing COGs but also includes [virtual file systems](https://gdal.org/user/virtual_file_systems.html) to access files over HTTP and from object storage of cloud providers including AWS S3 and Google Cloud Storage. 
-
-
 
 
 # Launching an EC2 instance on AWS
@@ -70,7 +68,7 @@ sudo apt update && sudo apt install r-base
 If you prefer to use RStudio, it is also straightforward to install RStudio Server and add a security rule to make it accessible on port 8787 in the AWS management console. Afterwards, we can install quite a few R packages:
 
 ```{r, eval = FALSE}
-install.packages(c("sf","stars","magick","rmarkdown","ncdf4","Rcpp","jsonlite","RcppProgress", "rstac", "tmap"))
+install.packages(c("sf", "stars", "magick", "rmarkdown", "ncdf4", "Rcpp", "jsonlite", "RcppProgress", "rstac", "tmap"))
 ```
 
 To avoid these step when launching another instance, we might collect everything in a Docker image and use additional services of 
@@ -262,25 +260,19 @@ tmap_mode("view")
 tm_basemap("Esri.WorldImagery") + tm_shape(difference) + tm_raster(palette = colorspace::sequential_hcl(8, palette = "Red-Blue"))
 ```
 
-
-
-
-
--> Further stars examples? 
-
-
-
-
-
-
-
+When we convert to stars objects, we can apply any R function
+to the data cube, such as spatial clustering, classification of
+time series, or time series analysis methods. Examples of this
+are given in the stars vignette [Statistical modelling with stars
+objects](https://r-spatial.github.io/stars/articles/stars7.html).
 
 # Summary
 
-
-With only a few lines of code, the combination of STAC, COGs, and data cubes allows to access and apply R functions on satellite imagery available on AWS. Even with a very small machine instance type, we could do some experiments for smaller areas of interest. Most of this is only possible because GDAL can efficiently read and write COGs even on cloud storage.
+With only a few lines of code, the combination of STAC, COGs, and data cubes allows to access and apply R functions on satellite imagery available on AWS. Even with a very small machine instance type, we could do some experiments for smaller areas of interest. Most of this is possible because GDAL efficiently reads and writes COGs, even on cloud storage.
 
 However, although STAC is gaining a lot of popularity these days, not all of the available catalogs point to individual images
-and some catalogs simply provide original image files but no COGs, which may slow down the processing. Furthermore the `rstac` package at the moment cannot work with static STAC catalogs (without API service). For a good reason, STAC API endpoints contain request limits on the number of returned features. When requesting longer time series or larger areas, these limits are quickly reached and it is up to the user to subdivide queries.
+and some catalogs simply provide original image files but no COGs, which may slow down processing. 
+For a good reason, STAC API endpoints have request limits on the number of returned features. When requesting 
+longer time series or larger areas, these limits are quickly reached and it is up to the user to subdivide queries. 
 
-The performed analyses have been rather simple but running more complex analyses is straightforward. In our examples, we used a rather modest EC2 instance (t3.large: 2 CPU's, 8 Gb RAM, I/O 5 Gigabit, 0.0832 USD per hour or 61 USD per month, + disk storage). Executing this R markdown document on this instance took around 7 minutes.  Although there are very powerful instance types (e.g. with 96 CPU cores, 768 GB main memory), analysis on very large scale might work better by running many instances at the same time. Cloud platforms of course include services to do this, and distributing the work outlined above over many instances involves additional considerations. 
+The performed analyses have been rather simple but running more complex analyses is straightforward. In our examples, we used a rather modest EC2 instance (`t3.large`: 2 CPU's, 8 Gb RAM, I/O 5 Gigabit, 0.0832 USD per hour or 61 USD per month, + disk storage). Executing this R markdown document on this instance  took around 7 minutes.  Although there are very powerful instance types (e.g. with 96 CPU cores, 768 GB main memory), analysis on very large scale might work better by running many instances in parallel. Cloud platforms of course include services to do this, and distributing the work outlined above over many instances involves additional considerations. 
