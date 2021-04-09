@@ -293,13 +293,16 @@ along with its standard error:
 
 ```{r}
 ar1 = function(ts) {
-  m = arima(ts, c(1, 0, 0)) # fit AR(1) model
-  c(coef(m)[1], sqrt(vcov(m)[1,1])) # coefficient + s.e.
+  ts = na.omit(ts)
+  if (length(ts) > 5) {
+    m = arima(na.omit(ts), c(1, 0, 0), method = "ML") # fit AR(1) model
+    c(coef(m)[1], sqrt(vcov(m)[1,1])) # coefficient + s.e.
+  } else
+    c(NA_real_, NA_real_)
 }
 res = st_apply(ndvi_2019, 1:2, ar1)
 plot(res)
 ```
-
 
 # Summary
 
